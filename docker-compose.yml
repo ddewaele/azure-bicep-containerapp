@@ -1,0 +1,21 @@
+services:
+
+  backend:
+    build: ./backend
+    # Not exposed to the host — only the frontend needs to reach it,
+    # which it does via the Docker network using the service name "backend".
+    environment:
+      PORT: "3000"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"       # open http://localhost:8080 in your browser
+    environment:
+      PORT: "80"
+      # Docker Compose puts both services on the same network.
+      # "backend" resolves to the backend container, mirroring how
+      # Azure Container Apps resolves it inside the environment.
+      BACKEND_URL: "http://backend:3000"
+    depends_on:
+      - backend
