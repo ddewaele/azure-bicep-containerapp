@@ -18,7 +18,14 @@ A single Bicep template that deploys the most cost-effective Linux VM possible o
 
 ## Estimated cost
 
-~$3.80/month for the B1s VM + ~$1.20/month for 30 GB Standard HDD = **~$5/month**.
+| Resource | Monthly cost |
+|---|---|
+| Standard_B1s VM (1 vCPU, 1 GiB) | ~$3.80 |
+| OS Disk — 30 GB Standard HDD | ~$1.20 |
+| Public IP — Standard SKU (static) | ~$3.65 |
+| **Total** | **~$8.65** |
+
+Note: Basic SKU public IPs were free but are being retired by Azure. Standard SKU is now required.
 
 ## Deploy
 
