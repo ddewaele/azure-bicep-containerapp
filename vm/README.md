@@ -31,7 +31,7 @@ az deployment group create \
   --resource-group rg-cheapvm \
   --template-file main.bicep \
   --parameters parameters/main.bicepparam \
-  --parameters sshPublicKey="$(cat ~/.ssh/id_ed25519.pub)"
+  --parameters sshPublicKey="$(cat ~/.ssh/azure-cheap-vm/ed25519.pub)"
 ```
 
 ## Connect
