@@ -83,14 +83,14 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
 }
 
 // ---------------------------------------------------------------------------
-// Public IP (Basic SKU — free when attached to a running VM)
+// Public IP (Standard SKU — required, Basic SKU is being retired)
 // ---------------------------------------------------------------------------
 resource publicIp 'Microsoft.Network/publicIPAddresses@2023-09-01' = {
   name: '${prefix}-pip'
   location: location
-  sku: { name: 'Basic' }
+  sku: { name: 'Standard' }
   properties: {
-    publicIPAllocationMethod: 'Dynamic'
+    publicIPAllocationMethod: 'Static'
     dnsSettings: {
       domainNameLabel: '${prefix}-${uniqueSuffix}'
     }
