@@ -16,3 +16,7 @@ node_modules/
 
 # Docker
 docker-compose.override.yml
+
+# Compiled ARM templates
+*.json
+!**/parameters/*.json
