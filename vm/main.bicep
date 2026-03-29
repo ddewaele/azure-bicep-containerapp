@@ -3,6 +3,8 @@
 //
 // Deploys: VNet + Subnet, NSG, Public IP, NIC, and the VM itself.
 // Uses SSH key authentication (no password) for security.
+// Includes a system-assigned managed identity so the VM can authenticate
+// to Azure services (ACR, Key Vault, etc.) without passwords.
 // =============================================================================
 targetScope = 'resourceGroup'
 
@@ -123,6 +125,13 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
 resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
   name: vmName
   location: location
+  // System-assigned managed identity — Azure's equivalent of an AWS instance profile.
+  // Allows the VM to authenticate to Azure services via `az login --identity`
+  // without passwords or tokens. Assign roles (e.g. AcrPull) to the identity's
+  // principalId to grant access to specific resources.
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     hardwareProfile: {
       vmSize: vmSize
@@ -182,3 +191,6 @@ output fqdn string = publicIp.properties.dnsSettings.fqdn
 
 @description('SSH command to connect to the VM.')
 output sshCommand string = 'ssh ${adminUsername}@${publicIp.properties.dnsSettings.fqdn}'
+
+@description('Principal ID of the VM managed identity — use this for role assignments.')
+output principalId string = vm.identity.principalId

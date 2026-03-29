@@ -15,6 +15,7 @@ A single Bicep template that deploys the most cost-effective Linux VM possible o
 
 **OS:** Ubuntu 24.04 LTS
 **Auth:** SSH key only (no password)
+**Identity:** System-assigned managed identity (Azure's equivalent of an AWS instance profile)
 
 ## Estimated cost
 
@@ -59,6 +60,62 @@ ssh azureuser@$(az deployment group show \
   --output tsv)
 ```
 
+
+## Managed identity
+
+The VM is deployed with a **system-assigned managed identity**. This is Azure's equivalent of an AWS instance profile — it lets the VM authenticate to Azure services without passwords or tokens.
+
+### How it works
+
+When the VM is created with `identity: { type: 'SystemAssigned' }`, Azure:
+1. Creates a service principal (identity) tied to the VM's lifecycle
+2. Makes a token available via the Instance Metadata Service (`169.254.169.254`)
+3. The Azure CLI reads this token when you run `az login --identity`
+
+When the VM is deleted, the identity is automatically cleaned up.
+
+### Using it on the VM
+
+```bash
+# Authenticate using the managed identity (no password, no browser)
+az login --identity
+
+# Verify
+az account show
+```
+
+### Granting access to Azure services
+
+The identity has no permissions by default. Assign roles to grant access:
+
+```bash
+# Get the VM's principal ID from the deployment output
+PRINCIPAL_ID=$(az deployment group show \
+  --resource-group rg-cheapvm \
+  --name main \
+  --query "properties.outputs.principalId.value" \
+  --output tsv)
+
+# Example: grant pull access to an Azure Container Registry
+ACR_ID=$(az acr show --name <registry-name> --query id --output tsv)
+az role assignment create --assignee $PRINCIPAL_ID --role AcrPull --scope $ACR_ID
+
+# Example: grant read access to an entire resource group
+RG_ID=$(az group show --name <rg-name> --query id --output tsv)
+az role assignment create --assignee $PRINCIPAL_ID --role Reader --scope $RG_ID
+```
+
+Then on the VM, after `az login --identity`, commands like `az acr login` or `az resource list` work according to the assigned roles.
+
+### AWS vs Azure comparison
+
+| Concept | AWS | Azure |
+|---|---|---|
+| Identity attached to a VM | Instance Profile + IAM Role | System-assigned Managed Identity |
+| Token endpoint | `169.254.169.254` (IMDSv2) | `169.254.169.254` (IMDS) |
+| CLI auto-detects? | Yes — `aws` CLI works immediately | No — run `az login --identity` once per session |
+| Permissions | IAM policies on the role | RBAC role assignments on the identity |
+| Lifecycle | Detached from instance independently | Deleted when VM is deleted |
 
 ## Useful commands
 
