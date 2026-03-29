@@ -300,95 +300,34 @@ ping 10.2.1.4
 
 To make spoke-to-spoke traffic flow through the hub, you need three things:
 
-1. **Enable IP forwarding** on hub-vm's NIC (so it acts as a router)
-2. **Enable IP forwarding** inside hub-vm's OS
-3. **Create User Defined Routes (UDRs)** on the spoke subnets pointing to hub-vm
+1. **Route tables (UDRs)** on the spoke subnets pointing to hub-vm — handled by `03-hub-routing.bicep`
+2. **Allow forwarded traffic** on the peerings — already set in `02-peering.bicep`
+3. **IP forwarding** on hub-vm's NIC and inside the OS — two manual steps after deploying
+
+Deploy step 3, then run the two manual commands:
 
 ```bash
-# 1. Enable IP forwarding on hub-vm's NIC (from your local machine)
+# Deploy route tables (see the Deploy section above for full commands)
+az deployment group create \
+  --resource-group rg-vnet-peering \
+  --template-file 03-hub-routing.bicep \
+  --parameters hubVmPrivateIp=10.10.1.4
+
+# Enable IP forwarding on hub-vm's NIC
 az network nic update \
   --resource-group rg-vnet-peering \
   --name hub-vm-nic \
   --ip-forwarding true
-
-# 2. Enable IP forwarding in the OS (on hub-vm)
-sudo sysctl -w net.ipv4.ip_forward=1
-echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
-
-# 3. Create a route table pointing spoke traffic through hub-vm
-HUB_VM_IP=10.10.1.4
-
-# Route table for Spoke A: "to reach Spoke B, go through hub-vm"
-az network route-table create \
-  --resource-group rg-vnet-peering \
-  --name spoke-a-to-b-rt \
-  --location westeurope
-
-az network route-table route create \
-  --resource-group rg-vnet-peering \
-  --route-table-name spoke-a-to-b-rt \
-  --name to-spoke-b \
-  --address-prefix 10.2.0.0/16 \
-  --next-hop-type VirtualAppliance \
-  --next-hop-ip-address $HUB_VM_IP
-
-# Attach route table to Spoke A subnets
-az network vnet subnet update \
-  --resource-group rg-vnet-peering \
-  --vnet-name spoke-a-vnet \
-  --name web \
-  --route-table spoke-a-to-b-rt
-
-az network vnet subnet update \
-  --resource-group rg-vnet-peering \
-  --vnet-name spoke-a-vnet \
-  --name app \
-  --route-table spoke-a-to-b-rt
-
-# Route table for Spoke B: "to reach Spoke A, go through hub-vm"
-az network route-table create \
-  --resource-group rg-vnet-peering \
-  --name spoke-b-to-a-rt \
-  --location westeurope
-
-az network route-table route create \
-  --resource-group rg-vnet-peering \
-  --route-table-name spoke-b-to-a-rt \
-  --name to-spoke-a \
-  --address-prefix 10.1.0.0/16 \
-  --next-hop-type VirtualAppliance \
-  --next-hop-ip-address $HUB_VM_IP
-
-az network vnet subnet update \
-  --resource-group rg-vnet-peering \
-  --vnet-name spoke-b-vnet \
-  --name web \
-  --route-table spoke-b-to-a-rt
-
-az network vnet subnet update \
-  --resource-group rg-vnet-peering \
-  --vnet-name spoke-b-vnet \
-  --name data \
-  --route-table spoke-b-to-a-rt
 ```
 
-Also enable "Allow Forwarded Traffic" on the peerings:
+Then SSH into hub-vm and enable IP forwarding in the OS:
 
 ```bash
-az network vnet peering update \
-  --resource-group rg-vnet-peering \
-  --vnet-name spoke-a-vnet \
-  --name spoke-a-to-hub \
-  --set allowForwardedTraffic=true
-
-az network vnet peering update \
-  --resource-group rg-vnet-peering \
-  --vnet-name spoke-b-vnet \
-  --name spoke-b-to-hub \
-  --set allowForwardedTraffic=true
+sudo sysctl -w net.ipv4.ip_forward=1
+echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
 ```
 
-Now retry the ping from spoke-a-web to spoke-b-web:
+Now test the ping from spoke-a-web to spoke-b-web:
 
 ```bash
 # On spoke-a-web:
