@@ -6,14 +6,14 @@ Deploys a hub-spoke network with three VNets, two subnets each, peered through a
 
 ```
                     ┌─────────────────────────────────┐
-                    │     Hub VNet — 10.0.0.0/16       │
+                    │     Hub VNet — 10.10.0.0/16      │
                     │                                  │
                     │  ┌───────────────────────────┐   │
-                    │  │ shared      10.0.1.0/24   │   │
+                    │  │ shared      10.10.1.0/24  │   │
                     │  │ hub-vm (public IP for SSH) │   │
                     │  └───────────────────────────┘   │
                     │  ┌───────────────────────────┐   │
-                    │  │ management  10.0.2.0/24   │   │
+                    │  │ management  10.10.2.0/24  │   │
                     │  └───────────────────────────┘   │
                     └──────────┬───────┬───────────────┘
                        peering │       │ peering
@@ -38,7 +38,7 @@ Deploys a hub-spoke network with three VNets, two subnets each, peered through a
 
 | Resource | Purpose |
 |---|---|
-| Hub VNet (10.0.0.0/16) | Central hub — shared services, jump box |
+| Hub VNet (10.10.0.0/16) | Central hub — shared services, jump box |
 | Spoke A VNet (10.1.0.0/16) | First workload — web + app tiers |
 | Spoke B VNet (10.2.0.0/16) | Second workload — web + data tiers |
 | Hub ↔ Spoke A peering | Bidirectional peering |
@@ -55,8 +55,8 @@ Deploys a hub-spoke network with three VNets, two subnets each, peered through a
 
 | VNet | CIDR | Subnet | Subnet CIDR |
 |---|---|---|---|
-| Hub | 10.0.0.0/16 | shared | 10.0.1.0/24 |
-| | | management | 10.0.2.0/24 |
+| Hub | 10.10.0.0/16 | shared | 10.10.1.0/24 |
+| | | management | 10.10.2.0/24 |
 | Spoke A | 10.1.0.0/16 | web | 10.1.1.0/24 |
 | | | app | 10.1.2.0/24 |
 | Spoke B | 10.2.0.0/16 | web | 10.2.1.0/24 |
@@ -68,7 +68,7 @@ No overlaps — all three VNets are peerable.
 
 | VM | VNet | Subnet | Private IP range | Public IP | Role |
 |---|---|---|---|---|---|
-| hub-vm | Hub | shared | 10.0.1.x | Yes | Jump box + IP forwarding (router) |
+| hub-vm | Hub | shared | 10.10.1.x | Yes | Jump box + IP forwarding (router) |
 | spoke-a-web | Spoke A | web | 10.1.1.x | No | Web tier |
 | spoke-a-app | Spoke A | app | 10.1.2.x | No | App tier |
 | spoke-b-web | Spoke B | web | 10.2.1.x | No | Web tier |
@@ -185,7 +185,7 @@ ping 10.1.2.4
 
 ### Scenario 2 — Hub to spoke
 
-**Test:** From hub-vm (10.0.1.x), ping spoke-a-web (10.1.1.x)
+**Test:** From hub-vm (10.10.1.x), ping spoke-a-web (10.1.1.x)
 
 ```bash
 # On hub-vm:
@@ -198,11 +198,11 @@ ping 10.1.1.4
 
 ### Scenario 3 — Spoke to hub
 
-**Test:** From spoke-b-web (10.2.1.x), ping hub-vm (10.0.1.x)
+**Test:** From spoke-b-web (10.2.1.x), ping hub-vm (10.10.1.x)
 
 ```bash
 # On spoke-b-web:
-ping 10.0.1.4
+ping 10.10.1.4
 ```
 
 **Expected:** Works. Peering is bidirectional — Spoke B can reach Hub just as Hub can reach Spoke B.
@@ -240,7 +240,7 @@ sudo sysctl -w net.ipv4.ip_forward=1
 echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
 
 # 3. Create a route table pointing spoke traffic through hub-vm
-HUB_VM_IP=10.0.1.4
+HUB_VM_IP=10.10.1.4
 
 # Route table for Spoke A: "to reach Spoke B, go through hub-vm"
 az network route-table create \
@@ -426,7 +426,7 @@ All of these are workarounds. The clean solution is always to plan non-overlappi
 
 | Network | CIDR | Range | Use |
 |---|---|---|---|
-| Hub | 10.0.0.0/16 | 10.0.0.0 – 10.0.255.255 | Shared services |
+| Hub | 10.10.0.0/16 | 10.10.0.0 – 10.10.255.255 | Shared services |
 | Spoke A | 10.1.0.0/16 | 10.1.0.0 – 10.1.255.255 | First workload |
 | Spoke B | 10.2.0.0/16 | 10.2.0.0 – 10.2.255.255 | Second workload |
 | Spoke C | 10.3.0.0/16 | 10.3.0.0 – 10.3.255.255 | Third workload |
