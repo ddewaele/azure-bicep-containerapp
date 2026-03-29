@@ -37,7 +37,7 @@ param vmSize string = 'Standard_B2ats_v2'
 var vmImage = {
   publisher: 'Canonical'
   offer:     'ubuntu-24_04-lts'
-  sku:       'server-arm64'
+  sku:       'server'
   version:   'latest'
 }
 
