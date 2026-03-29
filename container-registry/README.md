@@ -120,6 +120,11 @@ newgrp docker
 docker ps
 ```
 
+### Installing the azure cli
+
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+
 ### Authenticate to ACR from the VM
 
 There are three ways to authenticate. From most to least recommended:
@@ -275,6 +280,24 @@ docker compose up -d
 
 # View logs
 docker compose logs -f
+```
+
+Your docker compose might look something like this
+
+```
+services:
+  backend:
+    image: az104labvgyscrfmmz4du.azurecr.io/backend:latest
+    restart: unless-stopped
+
+  frontend:
+    image: az104labvgyscrfmmz4du.azurecr.io/frontend:latest
+    ports:
+      - "80:80"
+    environment:
+      BACKEND_URL: "http://backend:3000"
+    depends_on:
+      - backend
 ```
 
 ### NSG rules for web traffic
