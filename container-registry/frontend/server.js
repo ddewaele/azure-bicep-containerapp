@@ -33,6 +33,26 @@ function log(level, message, fields = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Extract standard access-log fields from a request (similar to ALB/nginx logs)
+// ---------------------------------------------------------------------------
+function requestInfo(req) {
+  return {
+    remoteIp:      (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(),
+    remotePort:    req.socket.remotePort,
+    method:        req.method,
+    path:          req.url,
+    httpVersion:   req.httpVersion,
+    host:          req.headers.host || '-',
+    userAgent:     req.headers['user-agent'] || '-',
+    referer:       req.headers.referer || '-',
+    contentLength: req.headers['content-length'] || 0,
+    accept:        req.headers.accept || '-',
+    forwarded:     req.headers['x-forwarded-for'] || '-',
+    protocol:      req.headers['x-forwarded-proto'] || 'http',
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Proxy: forward /api/* transparently to the internal backend container.
 //
 // The browser only ever talks to this frontend server (public HTTPS).
@@ -54,8 +74,7 @@ function proxyToBackend(req, res) {
     upstreamRes.pipe(res)
 
     log('info', 'Proxy request completed', {
-      method:        req.method,
-      path:          req.url,
+      ...requestInfo(req),
       backendHost:   backend.hostname,
       backendStatus: upstreamRes.statusCode,
       durationMs:    Date.now() - start,
@@ -67,8 +86,7 @@ function proxyToBackend(req, res) {
     res.end(JSON.stringify({ error: 'Backend unavailable', detail: err.message }))
 
     log('error', 'Proxy request failed', {
-      method:      req.method,
-      path:        req.url,
+      ...requestInfo(req),
       backendHost: backend.hostname,
       error:       err.message,
       durationMs:  Date.now() - start,
@@ -92,8 +110,8 @@ const server = http.createServer((req, res) => {
   res.end(html)
 
   log('info', 'Served SPA', {
-    method: req.method,
-    path:   req.url,
+    ...requestInfo(req),
+    status: 200,
   })
 })
 
