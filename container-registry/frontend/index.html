@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Azure Container Apps Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f3f4f6;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    h1 { font-size: 1.4rem; color: #111827; margin-bottom: 0.25rem; }
+    .subtitle { font-size: 0.875rem; color: #6b7280; margin-bottom: 1.75rem; }
+
+    .architecture {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-size: 0.8rem;
+      color: #374151;
+      margin-bottom: 1.75rem;
+      line-height: 1.7;
+    }
+    .architecture code { font-family: 'Courier New', monospace; color: #6d28d9; }
+
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover  { background: #1d4ed8; }
+    button:active { background: #1e40af; }
+    button:disabled { background: #93c5fd; cursor: default; }
+
+    .response-box {
+      margin-top: 1.25rem;
+      background: #0f172a;
+      color: #a3e635;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      min-height: 5rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .response-box.error { color: #f87171; }
+    .response-box.idle  { color: #475569; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Azure Container Apps Demo</h1>
+    <p class="subtitle">Single-page app talking to a private backend API</p>
+
+    <div class="architecture">
+      <strong>Request flow</strong><br/>
+      Browser → <code>HTTPS</code> → Frontend (Node.js)<br/>
+      Frontend → <code>http://backend</code> → Backend (Node.js)<br/>
+      <em>The backend has no public endpoint.</em>
+    </div>
+
+    <button id="btn">Call Backend API</button>
+
+    <pre id="output" class="response-box idle">Press the button to send a request.</pre>
+  </div>
+
+  <script>
+    const btn    = document.getElementById('btn')
+    const output = document.getElementById('output')
+
+    btn.addEventListener('click', async () => {
+      btn.disabled  = true
+      btn.textContent = 'Calling backend…'
+      output.className = 'response-box'
+      output.textContent = 'Waiting for response…'
+
+      try {
+        // Calls /api/message on the same origin.
+        // The frontend Node.js server proxies this to the internal backend.
+        const res  = await fetch('/api/message')
+        const data = await res.json()
+
+        output.textContent = JSON.stringify(data, null, 2)
+      } catch (err) {
+        output.className  = 'response-box error'
+        output.textContent = `Error: ${err.message}`
+      } finally {
+        btn.disabled    = false
+        btn.textContent = 'Call Backend API'
+      }
+    })
+  </script>
+</body>
+</html>
