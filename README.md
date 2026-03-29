@@ -7,4 +7,5 @@ A collection of minimal Azure Bicep templates for learning and reference. Each p
 | Project | Description |
 |---|---|
 | [container-apps/](container-apps/) | Frontend SPA + backend API on Azure Container Apps, linked over HTTPS |
+| [container-registry/](container-registry/) | Azure Container Registry — build and push Docker images |
 | [vm/](vm/) | Cheapest possible Linux VM in Azure |
