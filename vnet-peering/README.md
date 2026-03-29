@@ -123,9 +123,21 @@ No parameters needed — it references the existing VNets by name. Test **Scenar
 ### Step 3 — Enable spoke-to-spoke routing via hub
 
 ```bash
+# Get hub-vm's private IP
+HUB_IP=$(az vm list-ip-addresses -g rg-vnet-peering -n hub-vm \
+  --query "[0].virtualMachine.network.privateIpAddresses[0]" -o tsv)
+
+# Deploy route tables and attach them to spoke subnets
 az deployment group create \
   --resource-group rg-vnet-peering \
-  --template-file 03-hub-routing.bicep
+  --template-file 03-hub-routing.bicep \
+  --parameters hubVmPrivateIp=$HUB_IP
+
+# Enable IP forwarding on hub-vm's NIC
+az network nic update \
+  --resource-group rg-vnet-peering \
+  --name hub-vm-nic \
+  --ip-forwarding true
 ```
 
 Then SSH into hub-vm and enable IP forwarding in the OS:
