@@ -174,14 +174,78 @@ ssh -A azureuser@<hub-vm-public-ip>
 
 **Test:** From spoke-a-web (10.1.1.x), ping spoke-a-app (10.1.2.x)
 
+**How to access the VM:** After deploying `01-vnets.bicep`, there is no peering yet — hub-vm cannot reach the spoke VMs. To test this scenario you need to get onto a spoke VM directly. Two options:
+
+1. **Azure Bastion** — deploy a Bastion host in the Spoke A VNet and connect via the portal (no public IP needed)
+2. **Temporary public IP** — assign a public IP to spoke-a-web or spoke-a-app, SSH in, then remove it after testing:
+
 ```bash
-# On spoke-a-web:
+# Create a temporary public IP
+az network public-ip create \
+  --resource-group rg-vnet-peering \
+  --name spoke-a-web-tmp-pip \
+  --sku Standard \
+  --allocation-method Static
+
+# Attach it to the NIC
+az network nic ip-config update \
+  --resource-group rg-vnet-peering \
+  --nic-name spoke-a-web-nic \
+  --name ipconfig1 \
+  --public-ip-address spoke-a-web-tmp-pip
+
+# Get the IP
+az network public-ip show \
+  --resource-group rg-vnet-peering \
+  --name spoke-a-web-tmp-pip \
+  --query ipAddress \
+  --output tsv
+
+# SSH in and run the test
+ssh azureuser@<temporary-public-ip>
+
+# Clean up after testing
+az network nic ip-config update \
+  --resource-group rg-vnet-peering \
+  --nic-name spoke-a-web-nic \
+  --name ipconfig1 \
+  --public-ip-address ""
+
+az network public-ip delete \
+  --resource-group rg-vnet-peering \
+  --name spoke-a-web-tmp-pip
+```
+
+Once on the VM, test connectivity:
+
+```bash
+# Ping by private IP
 ping 10.1.2.4
+
+# Or ping by VM hostname (see "Azure internal DNS" below)
+ping spoke-a-app
 ```
 
 **Expected:** Works. Subnets within the same VNet can communicate by default — no peering needed, no extra configuration.
 
 **Lesson:** A VNet is a flat network at layer 3. Subnets are just organizational boundaries. All subnets in a VNet can route to each other unless you add NSG rules to block it.
+
+### Azure internal DNS
+
+Notice that you can ping by **hostname** (`ping spoke-a-web`) instead of IP address:
+
+```
+azureuser@spoke-a-app:~$ ping spoke-a-web
+PING spoke-a-web.lruiz5hflcrujevuvbfgztyqvb.ax.internal.cloudapp.net (10.1.1.4) 56(84) bytes of data.
+64 bytes from spoke-a-web.internal.cloudapp.net (10.1.1.4): icmp_seq=1 ttl=64 time=0.536 ms
+```
+
+Azure automatically provides **internal DNS** for all VMs within the same VNet. Every VM is registered under `<hostname>.internal.cloudapp.net` and can be resolved by its short hostname from any other VM in the same VNet.
+
+Key points:
+- **Same VNet only** — by default, VMs in peered VNets cannot resolve each other by hostname (you need Azure Private DNS zones for that)
+- **Automatic** — no configuration needed, Azure registers the VM's `computerName` as the DNS hostname
+- **The long FQDN** (`spoke-a-web.lruiz5hflcrujevuvbfgztyqvb.ax.internal.cloudapp.net`) includes a hash unique to the VNet — but the short name (`spoke-a-web`) works just fine
 
 ### Scenario 2 — Hub to spoke
 
