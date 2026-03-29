@@ -78,19 +78,64 @@ Only hub-vm has a public IP. All other VMs are accessed by SSH-ing through hub-v
 
 ## Estimated cost
 
-5x B1s VMs + 1 Standard IP + 5 disks = **~$40/month**. VNet peering is free within the same region.
+5x B2ats_v2 VMs + 1 Standard IP + 5 disks = **~$40/month**. VNet peering is free within the same region.
+
+## Project structure
+
+```
+vnet-peering/
+├── 01-vnets.bicep             # Step 1: 3 VNets, 6 subnets, 5 VMs (no peering)
+├── 02-peering.bicep           # Step 2: Hub↔Spoke peering
+├── 03-hub-routing.bicep       # Step 3: IP forwarding + UDRs for spoke-to-spoke
+├── parameters/
+│   └── main.bicepparam        # Shared parameters for step 1
+└── README.md
+```
+
+Each file is deployed incrementally to the same resource group. Later steps reference resources created by earlier steps using the Bicep `existing` keyword.
 
 ## Deploy
+
+### Step 1 — VNets, subnets, VMs (no peering)
 
 ```bash
 az group create --name rg-vnet-peering --location westeurope
 
 az deployment group create \
   --resource-group rg-vnet-peering \
-  --template-file main.bicep \
+  --template-file 01-vnets.bicep \
   --parameters parameters/main.bicepparam \
   --parameters sshPublicKey="$(cat ~/.ssh/id_ed25519.pub)"
 ```
+
+After this step, test **Scenario 1** (same VNet, different subnets — works) and **Scenario 4** (cross-VNet — fails).
+
+### Step 2 — Add hub-spoke peering
+
+```bash
+az deployment group create \
+  --resource-group rg-vnet-peering \
+  --template-file 02-peering.bicep
+```
+
+No parameters needed — it references the existing VNets by name. Test **Scenarios 2 and 3** (hub↔spoke — works) and **Scenario 4 again** (spoke-to-spoke — still fails).
+
+### Step 3 — Enable spoke-to-spoke routing via hub
+
+```bash
+az deployment group create \
+  --resource-group rg-vnet-peering \
+  --template-file 03-hub-routing.bicep
+```
+
+Then SSH into hub-vm and enable IP forwarding in the OS:
+
+```bash
+sudo sysctl -w net.ipv4.ip_forward=1
+echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
+```
+
+Test **Scenario 5** (spoke-to-spoke via hub — works).
 
 ## Connect
 
