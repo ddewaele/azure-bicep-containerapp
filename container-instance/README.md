@@ -2,57 +2,64 @@
 
 Deploys a single container directly via **Azure Container Instance (ACI)** — no orchestrator, no environment, just a container with a public IP.
 
-This example reuses the backend API from the [container-apps](../container-apps/) project. Push the image to ACR once, then deploy it anywhere.
+This project builds up incrementally — each Bicep file adds a new capability on top of the base deployment.
 
-## Architecture
+## Architecture progression
 
-```
-Internet
-   │
-   ▼  port 3000 (TCP)
-┌─────────────────────────┐
-│  Container Group (ACI)  │
-│  ┌───────────────────┐  │
-│  │  backend container│  │
-│  │  /api/message     │  │
-│  └───────────────────┘  │
-│  Public IP              │
-└─────────────────────────┘
-```
+| File | What it adds |
+|---|---|
+| `main.bicep` | Base deployment — public IP, raw port |
+| `02-dns.bicep` | DNS name label — FQDN instead of bare IP |
+| `03-vnet.bicep` | VNet integration — private subnet, no public IP |
+| `04-appgw.bicep` | Application Gateway — public HTTP on port 80, ACI private |
+| `05-fileshare.bicep` | Azure Files volume mount — read files from the container |
 
 ## Prerequisites
 
-1. The backend image built and pushed to ACR:
+1. **ACR registry** deployed and admin credentials enabled — see the [container-registry](../container-registry/) project.
+
+2. **Backend image** built and pushed:
    ```bash
+   # For main / 02-dns / 03-vnet / 04-appgw (original backend):
    az acr build \
-     --registry <registryName> \
+     --registry $REGISTRY_NAME \
      --image backend:latest \
      container-apps/backend/
+
+   # For 05-fileshare (extended backend with /api/files route):
+   az acr build \
+     --registry $REGISTRY_NAME \
+     --image backend:latest \
+     container-instance/backend/
    ```
 
-2. ACR admin credentials enabled:
-   ```bash
-   az acr update --name <registryName> --admin-enabled true
-   ```
-
-## Deploy
-
-This project depends on the ../container-registry project for the ACR deployment. Make sure to deploy that first and note the registry name and admin password. (or use the commands below to retrieve them from the deployment outputs)
+## Common setup
 
 ```bash
-# Create resource group
+# Create resource group (shared across all steps)
 az group create --name rg-container-instance --location westeurope
 
+# Retrieve registry name and password from container-registry deployment
 REGISTRY_NAME=$(az deployment group show \
   --resource-group rg-acr-demo \
   --name main \
   --query "properties.outputs.registryName.value" \
   --output tsv)
 
-# Get ACR admin password
-ACR_PASSWORD=$(az acr credential show --name $REGISTRY_NAME --query "passwords[0].value" -o tsv)
+ACR_PASSWORD=$(az acr credential show \
+  --name $REGISTRY_NAME \
+  --query "passwords[0].value" -o tsv)
+```
 
-# Deploy
+Update `<your-registry-name>` in the relevant `parameters/*.json` file with `$REGISTRY_NAME` before deploying.
+
+---
+
+## Step 1 — Base deployment (`main.bicep`)
+
+Public IP, raw port. The simplest possible ACI deployment.
+
+```bash
 az deployment group create \
   --resource-group rg-container-instance \
   --template-file main.bicep \
@@ -60,45 +67,157 @@ az deployment group create \
   --parameters registryPassword="$ACR_PASSWORD"
 ```
 
-## Test
-
 ```bash
-# Get public IP
-IP=$(az container show \
-  --resource-group rg-container-instance \
-  --name backend-aci \
+IP=$(az container show -g rg-container-instance -n backend-aci \
   --query ipAddress.ip -o tsv)
-
-# Call the API
 curl http://$IP:3000/api/message
 ```
 
-Expected response:
-```json
-{
-  "message": "Hello from the backend API!",
-  "hostname": "...",
-  "timestamp": "..."
-}
+---
+
+## Step 2 — DNS name label (`02-dns.bicep`)
+
+Assigns a stable hostname: `<label>.westeurope.azurecontainer.io`
+
+```bash
+az deployment group create \
+  --resource-group rg-container-instance \
+  --template-file 02-dns.bicep \
+  --parameters @parameters/02-dns.json \
+  --parameters registryPassword="$ACR_PASSWORD"
 ```
 
-## View logs
+```bash
+FQDN=$(az container show -g rg-container-instance -n backend-aci-dns \
+  --query ipAddress.fqdn -o tsv)
+curl http://$FQDN:3000/api/message
+```
+
+---
+
+## Step 3 — VNet integration (`03-vnet.bicep`)
+
+Deploys ACI into a private subnet — no public IP. The container is only reachable from within the VNet or a peered network.
+
+```bash
+az deployment group create \
+  --resource-group rg-container-instance \
+  --template-file 03-vnet.bicep \
+  --parameters @parameters/03-vnet.json \
+  --parameters registryPassword="$ACR_PASSWORD"
+```
+
+To test, deploy a jump VM into the same VNet or peer it with an existing VNet that has Bastion access.
+
+```bash
+# Get the private IP from deployment output
+az deployment group show \
+  -g rg-container-instance -n 03-vnet \
+  --query properties.outputs.privateIp.value -o tsv
+```
+
+---
+
+## Step 4 — Application Gateway (`04-appgw.bicep`)
+
+Puts an Application Gateway Standard_v2 in front of ACI. Traffic enters on port 80 via public IP and is forwarded to the container's private IP on port 3000.
+
+> **Cost note**: App GW Standard_v2 costs ~$0.008/hr plus capacity units. Delete the resource group when done.
+
+```bash
+az deployment group create \
+  --resource-group rg-container-instance \
+  --template-file 04-appgw.bicep \
+  --parameters @parameters/04-appgw.json \
+  --parameters registryPassword="$ACR_PASSWORD"
+```
+
+```bash
+APP_GW_IP=$(az deployment group show \
+  -g rg-container-instance -n 04-appgw \
+  --query properties.outputs.appGwPublicIp.value -o tsv)
+
+# Port 80 via App GW — no port number needed
+curl http://$APP_GW_IP/api/message
+```
+
+---
+
+## Step 5 — Azure Files volume mount (`05-fileshare.bicep`)
+
+Creates an Azure Storage Account + File Share, mounts it into the container at `/mnt/data`.
+
+The backend in `backend/server.js` adds two new routes:
+
+| Route | Description |
+|---|---|
+| `GET /api/files` | Lists all files in the mounted share |
+| `GET /api/file?name=<filename>` | Returns the content of a single file |
+
+Build and push the updated backend image first:
+```bash
+az acr build \
+  --registry $REGISTRY_NAME \
+  --image backend:latest \
+  container-instance/backend/
+```
+
+Deploy:
+```bash
+az deployment group create \
+  --resource-group rg-container-instance \
+  --template-file 05-fileshare.bicep \
+  --parameters @parameters/05-fileshare.json \
+  --parameters registryPassword="$ACR_PASSWORD"
+```
+
+Upload a test file and read it back:
+```bash
+STORAGE_NAME=$(az deployment group show \
+  -g rg-container-instance -n 05-fileshare \
+  --query properties.outputs.storageAccountName.value -o tsv)
+
+STORAGE_KEY=$(az storage account keys list \
+  --account-name $STORAGE_NAME --query "[0].value" -o tsv)
+
+# Upload a file to the share
+echo "Hello from Azure Files!" > hello.txt
+az storage file upload \
+  --account-name $STORAGE_NAME \
+  --share-name aci-share \
+  --source hello.txt \
+  --account-key $STORAGE_KEY
+
+# List files via the API
+IP=$(az container show -g rg-container-instance -n backend-aci-files \
+  --query ipAddress.ip -o tsv)
+curl http://$IP:3000/api/files
+curl http://$IP:3000/api/file?name=hello.txt
+```
+
+---
+
+## View logs (any step)
 
 ```bash
 az container logs \
   --resource-group rg-container-instance \
-  --name backend-aci
+  --name <container-group-name>
 ```
+
+---
 
 ## ACI vs Container Apps
 
 | | ACI | Container Apps |
 |---|---|---|
 | Use case | Single container, quick deploys | Long-running apps, scale-to-zero |
-| Ingress | Raw IP + port | HTTPS with custom domain |
+| Ingress | Raw IP + port (or via App GW) | HTTPS with custom domain |
 | Scaling | Manual (redeploy) | Automatic (HTTP / event-driven) |
 | Cost | Per second (CPU + memory) | Per request (Consumption plan) |
 | Orchestration | None | Built-in (Dapr, KEDA) |
+
+---
 
 ## Clean up
 

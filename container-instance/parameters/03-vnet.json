@@ -6,10 +6,10 @@
       "value": "westeurope"
     },
     "containerGroupName": {
-      "value": "backend-aci"
+      "value": "backend-aci-vnet"
     },
     "registryName": {
-      "value": "az104labvgyscrfmmz4du"
+      "value": "<your-registry-name>"
     },
     "containerImage": {
       "value": "backend:latest"

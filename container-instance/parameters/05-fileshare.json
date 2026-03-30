@@ -6,13 +6,16 @@
       "value": "westeurope"
     },
     "containerGroupName": {
-      "value": "backend-aci"
+      "value": "backend-aci-files"
     },
     "registryName": {
-      "value": "az104labvgyscrfmmz4du"
+      "value": "<your-registry-name>"
     },
     "containerImage": {
       "value": "backend:latest"
+    },
+    "mountPath": {
+      "value": "/mnt/data"
     }
   }
 }
