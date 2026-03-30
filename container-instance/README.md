@@ -37,18 +37,26 @@ Internet
 
 ## Deploy
 
+This project depends on the ../container-registry project for the ACR deployment. Make sure to deploy that first and note the registry name and admin password. (or use the commands below to retrieve them from the deployment outputs)
+
 ```bash
 # Create resource group
 az group create --name rg-container-instance --location westeurope
 
+REGISTRY_NAME=$(az deployment group show \
+  --resource-group rg-acr-demo \
+  --name main \
+  --query "properties.outputs.registryName.value" \
+  --output tsv)
+
 # Get ACR admin password
-ACR_PASSWORD=$(az acr credential show --name <registryName> --query "passwords[0].value" -o tsv)
+ACR_PASSWORD=$(az acr credential show --name $REGISTRY_NAME --query "passwords[0].value" -o tsv)
 
 # Deploy
 az deployment group create \
   --resource-group rg-container-instance \
   --template-file main.bicep \
-  --parameters @parameters/main.bicepparam \
+  --parameters parameters/main.bicepparam \
   --parameters registryPassword="$ACR_PASSWORD"
 ```
 
