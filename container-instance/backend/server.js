@@ -50,7 +50,7 @@ const routes = {
   },
 
   // Returns the content of a single file from the mount.
-  // Usage: GET /api/files/hello.txt
+  // Usage: GET /api/file?name=hello.txt
   'GET /api/file': (req, res) => {
     const url      = new URL(req.url, `http://localhost`)
     const filename = url.searchParams.get('name')
