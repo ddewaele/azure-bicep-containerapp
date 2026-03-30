@@ -97,24 +97,51 @@ curl http://$FQDN:3000/api/message
 
 ## Step 3 — VNet integration (`03-vnet.bicep`)
 
-Deploys ACI into a private subnet — no public IP. The container is only reachable from within the VNet or a peered network.
+Deploys ACI into a private subnet alongside a **jump VM** and **Azure Bastion (Developer SKU, free)**. No public IPs anywhere — Bastion provides browser-based SSH access to the VM, from which you can curl the ACI.
+
+```
+Internet
+   │  (Bastion browser SSH)
+   ▼
+┌──────────────────────────────────────────┐
+│  VNet 10.0.0.0/16                        │
+│                                          │
+│  aci-subnet 10.0.1.0/24                  │
+│  ┌──────────────────────┐                │
+│  │  backend-aci (ACI)   │ ← private IP   │
+│  └──────────────────────┘                │
+│                                          │
+│  vm-subnet 10.0.2.0/24                   │
+│  ┌──────────────────────┐                │
+│  │  jump-vm             │ ← private IP   │
+│  └──────────────────────┘                │
+└──────────────────────────────────────────┘
+```
 
 ```bash
 az deployment group create \
   --resource-group rg-container-instance \
   --template-file 03-vnet.bicep \
   --parameters @parameters/03-vnet.json \
-  --parameters registryPassword="$ACR_PASSWORD"
+  --parameters registryPassword="$ACR_PASSWORD" \
+  --parameters sshPublicKey="$(cat ~/.ssh/id_rsa.pub)"
 ```
 
-To test, deploy a jump VM into the same VNet or peer it with an existing VNet that has Bastion access.
+Connect and test:
+1. Azure Portal → `jump-vm` → **Connect → Bastion**
+2. Log in as `azureuser` with your SSH private key
+3. From inside the VM:
 
 ```bash
-# Get the private IP from deployment output
-az deployment group show \
+# Get ACI private IP from deployment output
+ACI_IP=$(az deployment group show \
   -g rg-container-instance -n 03-vnet \
-  --query properties.outputs.privateIp.value -o tsv
+  --query properties.outputs.aciPrivateIp.value -o tsv)
+
+curl http://$ACI_IP:3000/api/message
 ```
+
+> **Note**: Bastion Developer SKU is browser-based only. `az network bastion ssh` (native client) requires Standard SKU.
 
 ---
 

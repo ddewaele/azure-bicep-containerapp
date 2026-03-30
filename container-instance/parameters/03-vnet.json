@@ -13,6 +13,12 @@
     },
     "containerImage": {
       "value": "backend:latest"
+    },
+    "adminUsername": {
+      "value": "azureuser"
+    },
+    "vmSize": {
+      "value": "Standard_B2ats_v2"
     }
   }
 }
