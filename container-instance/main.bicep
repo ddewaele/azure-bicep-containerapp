@@ -47,11 +47,11 @@ var registryServer   = '${registryName}.azurecr.io'
 var registryUsername = registryName
 var fullImage        = '${registryServer}/${containerImage}'
 
-@description('Number of vCPUs to allocate.')
-param cpuCores int = 1
+@description('Number of vCPUs to allocate (0.1–4).')
+param cpuCores string = '0.1'
 
-@description('Memory in GB to allocate.')
-param memoryGb string = '1'
+@description('Memory in GiB to allocate (0.1–16).')
+param memoryGb string = '0.1'
 
 @description('Port the container listens on.')
 param port int = 3000
@@ -104,7 +104,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
           ]
           resources: {
             requests: {
-              cpu:        cpuCores
+              cpu:        json(cpuCores)
               memoryInGB: json(memoryGb)
             }
           }
