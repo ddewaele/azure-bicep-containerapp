@@ -9,7 +9,7 @@
       "value": "backend-aci-dns"
     },
     "registryName": {
-      "value": "<your-registry-name>"
+      "value": "az104labvgyscrfmmz4du"
     },
     "containerImage": {
       "value": "backend:latest"

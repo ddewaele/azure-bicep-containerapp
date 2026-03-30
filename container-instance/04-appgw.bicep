@@ -43,6 +43,12 @@ param registryPassword string
 @description('Port the container listens on.')
 param port int = 3000
 
+@description('Number of vCPUs to allocate.')
+param cpuCores int = 1
+
+@description('Memory in GB to allocate.')
+param memoryGb string = '1'
+
 var registryServer   = '${registryName}.azurecr.io'
 var registryUsername = registryName
 var fullImage        = '${registryServer}/${containerImage}'
@@ -134,7 +140,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
             { name: 'PORT', value: string(port) }
           ]
           resources: {
-            requests: { cpu: 1, memoryInGB: json('1') }
+            requests: { cpu: cpuCores, memoryInGB: json(memoryGb) }
           }
         }
       }

@@ -51,6 +51,12 @@ param sshPublicKey string
 @description('VM size for the jump VM.')
 param vmSize string = 'Standard_B2ats_v2'
 
+@description('Number of vCPUs to allocate to the container.')
+param cpuCores int = 1
+
+@description('Memory in GB to allocate to the container.')
+param memoryGb string = '1'
+
 var registryServer   = '${registryName}.azurecr.io'
 var registryUsername = registryName
 var fullImage        = '${registryServer}/${containerImage}'
@@ -222,7 +228,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
             { name: 'PORT', value: string(port) }
           ]
           resources: {
-            requests: { cpu: 1, memoryInGB: json('1') }
+            requests: { cpu: cpuCores, memoryInGB: json(memoryGb) }
           }
         }
       }
