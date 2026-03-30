@@ -10,7 +10,7 @@
 //   az deployment group create \
 //     --resource-group rg-container-instance \
 //     --template-file main.bicep \
-//     --parameters parameters/main.bicepparam \
+//     --parameters @parameters/main.json \
 //     --parameters registryPassword='<acr-admin-password>'
 //
 // Get the ACR admin password:
@@ -33,18 +33,19 @@ param location string = resourceGroup().location
 @description('Name of the container group.')
 param containerGroupName string = 'backend-aci'
 
-@description('Container image to deploy, e.g. myregistry.azurecr.io/backend:latest')
-param containerImage string
+@description('ACR registry name (without .azurecr.io), e.g. myregistry')
+param registryName string
 
-@description('ACR login server, e.g. myregistry.azurecr.io')
-param registryServer string
-
-@description('ACR admin username.')
-param registryUsername string
+@description('Container image name and tag to deploy, e.g. backend:latest')
+param containerImage string = 'backend:latest'
 
 @description('ACR admin password.')
 @secure()
 param registryPassword string
+
+var registryServer   = '${registryName}.azurecr.io'
+var registryUsername = registryName
+var fullImage        = '${registryServer}/${containerImage}'
 
 @description('Number of vCPUs to allocate.')
 param cpuCores int = 1
@@ -73,6 +74,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       }
     ]
 
+
     ipAddress: {
       type: 'Public'
       ports: [
@@ -87,7 +89,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       {
         name: 'backend'
         properties: {
-          image: containerImage
+          image: fullImage
           ports: [
             {
               protocol: 'TCP'

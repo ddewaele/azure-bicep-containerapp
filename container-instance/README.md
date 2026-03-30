@@ -56,7 +56,7 @@ ACR_PASSWORD=$(az acr credential show --name $REGISTRY_NAME --query "passwords[0
 az deployment group create \
   --resource-group rg-container-instance \
   --template-file main.bicep \
-  --parameters parameters/main.bicepparam \
+  --parameters @parameters/main.json \
   --parameters registryPassword="$ACR_PASSWORD"
 ```
 
