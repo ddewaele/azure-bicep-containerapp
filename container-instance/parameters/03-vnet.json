@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westeurope"
+    },
+    "containerGroupName": {
+      "value": "backend-aci-vnet"
+    },
+    "containerImage": {
+      "value": "backend:latest"
+    },
+    "adminUsername": {
+      "value": "azureuser"
+    },
+    "vmSize": {
+      "value": "Standard_B2ats_v2"
+    }
+  }
+}
