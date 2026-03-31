@@ -8,9 +8,6 @@
     "containerGroupName": {
       "value": "backend-aci-appgw"
     },
-    "registryName": {
-      "value": "<your-registry-name>"
-    },
     "containerImage": {
       "value": "backend:latest"
     }

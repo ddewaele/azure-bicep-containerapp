@@ -8,9 +8,6 @@
     "containerGroupName": {
       "value": "backend-aci-files"
     },
-    "registryName": {
-      "value": "<your-registry-name>"
-    },
     "containerImage": {
       "value": "backend:latest"
     },

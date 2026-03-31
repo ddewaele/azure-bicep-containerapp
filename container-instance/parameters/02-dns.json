@@ -8,9 +8,6 @@
     "containerGroupName": {
       "value": "backend-aci-dns"
     },
-    "registryName": {
-      "value": "az104labvgyscrfmmz4du"
-    },
     "containerImage": {
       "value": "backend:latest"
     },

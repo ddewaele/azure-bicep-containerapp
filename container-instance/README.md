@@ -8,7 +8,7 @@ This project builds up incrementally — each Bicep file adds a new capability o
 
 | File | What it adds |
 |---|---|
-| `main.bicep` | Base deployment — public IP, raw port |
+| `01-simple-aci.bicep` | Base deployment — public IP, raw port |
 | `02-dns.bicep` | DNS name label — FQDN instead of bare IP |
 | `03-vnet.bicep` | VNet integration — private subnet, no public IP |
 | `04-appgw.bicep` | Application Gateway — public HTTP on port 80, ACI private |
@@ -20,7 +20,7 @@ This project builds up incrementally — each Bicep file adds a new capability o
 
 2. **Backend image** built and pushed:
    ```bash
-   # For main / 02-dns / 03-vnet / 04-appgw (original backend):
+   # For 01-simple-aci / 02-dns / 03-vnet / 04-appgw (original backend):
    az acr build \
      --registry $REGISTRY_NAME \
      --image backend:latest \
@@ -51,19 +51,20 @@ ACR_PASSWORD=$(az acr credential show \
   --query "passwords[0].value" -o tsv)
 ```
 
-Update `<your-registry-name>` in the relevant `parameters/*.json` file with `$REGISTRY_NAME` before deploying.
+`registryName` is passed via CLI for all steps — no need to edit any param file.
 
 ---
 
-## Step 1 — Base deployment (`main.bicep`)
+## Step 1 — Base deployment (`01-simple-aci.bicep`)
 
 Public IP, raw port. The simplest possible ACI deployment.
 
 ```bash
 az deployment group create \
   --resource-group rg-container-instance \
-  --template-file main.bicep \
-  --parameters @parameters/main.json \
+  --template-file 01-simple-aci.bicep \
+  --parameters @parameters/01-simple-aci.json \
+  --parameters registryName="$REGISTRY_NAME" \
   --parameters registryPassword="$ACR_PASSWORD"
 ```
 
@@ -84,6 +85,7 @@ az deployment group create \
   --resource-group rg-container-instance \
   --template-file 02-dns.bicep \
   --parameters @parameters/02-dns.json \
+  --parameters registryName="$REGISTRY_NAME" \
   --parameters registryPassword="$ACR_PASSWORD"
 ```
 
@@ -123,6 +125,7 @@ az deployment group create \
   --resource-group rg-container-instance \
   --template-file 03-vnet.bicep \
   --parameters @parameters/03-vnet.json \
+  --parameters registryName="$REGISTRY_NAME" \
   --parameters registryPassword="$ACR_PASSWORD" \
   --parameters sshPublicKey="$(cat ~/.ssh/id_rsa.pub)"
 ```
@@ -156,6 +159,7 @@ az deployment group create \
   --resource-group rg-container-instance \
   --template-file 04-appgw.bicep \
   --parameters @parameters/04-appgw.json \
+  --parameters registryName="$REGISTRY_NAME" \
   --parameters registryPassword="$ACR_PASSWORD"
 ```
 
@@ -195,6 +199,7 @@ az deployment group create \
   --resource-group rg-container-instance \
   --template-file 05-fileshare.bicep \
   --parameters @parameters/05-fileshare.json \
+  --parameters registryName="$REGISTRY_NAME" \
   --parameters registryPassword="$ACR_PASSWORD"
 ```
 

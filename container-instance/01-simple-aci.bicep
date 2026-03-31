@@ -9,8 +9,9 @@
 //
 //   az deployment group create \
 //     --resource-group rg-container-instance \
-//     --template-file main.bicep \
-//     --parameters @parameters/main.json \
+//     --template-file 01-simple-aci.bicep \
+//     --parameters @parameters/01-simple-aci.json \
+//     --parameters registryName='<acr-registry-name>' \
 //     --parameters registryPassword='<acr-admin-password>'
 //
 // Get the ACR admin password:
