@@ -1,0 +1,19 @@
+#cloud-config
+package_update: true
+packages:
+  - nginx
+runcmd:
+  - systemctl enable nginx
+  - systemctl start nginx
+  - |
+    cat > /var/www/html/index.html << 'EOF'
+    <!DOCTYPE html>
+    <html>
+      <body>
+        <h1>Web Tier</h1>
+        <p>Hostname: HOSTNAME_PLACEHOLDER</p>
+        <p>ASG: asg-web</p>
+      </body>
+    </html>
+    EOF
+  - sed -i "s/HOSTNAME_PLACEHOLDER/$(hostname)/" /var/www/html/index.html

@@ -1,0 +1,31 @@
+#cloud-config
+package_update: true
+write_files:
+  - path: /app/server.js
+    content: |
+      'use strict'
+      const http = require('http')
+      const os   = require('os')
+      const PORT = parseInt(process.env.PORT ?? '3000', 10)
+
+      const server = http.createServer((req, res) => {
+        if (req.method === 'GET' && req.url === '/api/message') {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({
+            message:   'Hello from the logic tier!',
+            hostname:  os.hostname(),
+            timestamp: new Date().toISOString(),
+          }))
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Not found' }))
+        }
+      })
+
+      server.listen(PORT, () =>
+        console.log(`Logic tier listening on port ${PORT}`)
+      )
+runcmd:
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  - node /app/server.js &
