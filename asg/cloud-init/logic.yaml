@@ -25,7 +25,29 @@ write_files:
       server.listen(PORT, () =>
         console.log(`Logic tier listening on port ${PORT}`)
       )
+
+  - path: /etc/systemd/system/logic-api.service
+    content: |
+      [Unit]
+      Description=Logic API Server
+      After=network.target
+
+      [Service]
+      ExecStart=/usr/bin/node /app/server.js
+      Restart=always
+      RestartSec=5
+      User=nobody
+      Environment=PORT=3000
+      WorkingDirectory=/app
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+
 runcmd:
   - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   - apt-get install -y nodejs
-  - node /app/server.js &
+  - systemctl daemon-reload
+  - systemctl enable logic-api
+  - systemctl start logic-api
