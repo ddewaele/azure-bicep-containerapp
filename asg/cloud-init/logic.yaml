@@ -1,20 +1,50 @@
 #cloud-config
 package_update: true
 write_files:
+  - path: /app/package.json
+    content: |
+      { "name": "logic-api", "version": "1.0.0" }
+
   - path: /app/server.js
     content: |
       'use strict'
-      const http = require('http')
-      const os   = require('os')
-      const PORT = parseInt(process.env.PORT ?? '3000', 10)
+      const http        = require('http')
+      const os          = require('os')
+      const { Client }  = require('pg')
 
-      const server = http.createServer((req, res) => {
+      const PORT    = 3000
+      const DB_HOST = '__DB_VM_IP__'
+      const DB_PORT = 5432
+
+      // Connect to PostgreSQL and return the version string
+      async function queryDb() {
+        const client = new Client({
+          host:                    DB_HOST,
+          port:                    DB_PORT,
+          user:                    'postgres',
+          password:                'demo1234',
+          database:                'postgres',
+          connectionTimeoutMillis: 5000,
+        })
+        try {
+          await client.connect()
+          const res = await client.query('SELECT version()')
+          await client.end()
+          return { ok: true, version: res.rows[0].version }
+        } catch (e) {
+          return { ok: false, error: e.message }
+        }
+      }
+
+      const server = http.createServer(async (req, res) => {
         if (req.method === 'GET' && req.url === '/api/message') {
+          const db = await queryDb()
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({
             message:   'Hello from the logic tier!',
             hostname:  os.hostname(),
             timestamp: new Date().toISOString(),
+            database:  db,
           }))
         } else {
           res.writeHead(404, { 'Content-Type': 'application/json' })
@@ -22,9 +52,7 @@ write_files:
         }
       })
 
-      server.listen(PORT, () =>
-        console.log(`Logic tier listening on port ${PORT}`)
-      )
+      server.listen(PORT, () => console.log('Logic tier listening on port ' + PORT))
 
   - path: /etc/systemd/system/logic-api.service
     content: |
@@ -37,7 +65,6 @@ write_files:
       Restart=always
       RestartSec=5
       User=nobody
-      Environment=PORT=3000
       WorkingDirectory=/app
       StandardOutput=journal
       StandardError=journal
@@ -48,6 +75,7 @@ write_files:
 runcmd:
   - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   - apt-get install -y nodejs
+  - npm --prefix /app install pg
   - systemctl daemon-reload
   - systemctl enable logic-api
   - systemctl start logic-api
