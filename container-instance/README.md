@@ -37,13 +37,15 @@ This project builds up incrementally — each Bicep file adds a new capability o
 
 ```bash
 LOCATION=westeurope
+RG=rg-container-instance
+RG_ACR=rg-acr-demo
 
 # Create resource group (shared across all steps)
-az group create --name rg-container-instance --location $LOCATION
+az group create --name $RG --location $LOCATION
 
 # Retrieve registry name and password from container-registry deployment
 REGISTRY_NAME=$(az deployment group show \
-  --resource-group rg-acr-demo \
+  --resource-group $RG_ACR \
   --name main \
   --query "properties.outputs.registryName.value" \
   --output tsv)
@@ -63,7 +65,7 @@ Public IP, raw port. The simplest possible ACI deployment.
 
 ```bash
 az deployment group create \
-  --resource-group rg-container-instance \
+  --resource-group $RG \
   --template-file 01-simple-aci.bicep \
   --parameters @parameters/01-simple-aci.json \
   --parameters registryName="$REGISTRY_NAME" \
@@ -71,7 +73,7 @@ az deployment group create \
 ```
 
 ```bash
-IP=$(az container show -g rg-container-instance -n backend-aci \
+IP=$(az container show -g $RG -n backend-aci \
   --query ipAddress.ip -o tsv)
 curl http://$IP:3000/api/message
 ```
@@ -84,7 +86,7 @@ Assigns a stable hostname: `<label>.<region>.azurecontainer.io` (region matches 
 
 ```bash
 az deployment group create \
-  --resource-group rg-container-instance \
+  --resource-group $RG \
   --template-file 02-dns.bicep \
   --parameters @parameters/02-dns.json \
   --parameters registryName="$REGISTRY_NAME" \
@@ -92,7 +94,7 @@ az deployment group create \
 ```
 
 ```bash
-FQDN=$(az container show -g rg-container-instance -n backend-aci-dns \
+FQDN=$(az container show -g $RG -n backend-aci-dns \
   --query ipAddress.fqdn -o tsv)
 curl http://$FQDN:3000/api/message
 ```
@@ -124,7 +126,7 @@ Internet
 
 ```bash
 az deployment group create \
-  --resource-group rg-container-instance \
+  --resource-group $RG \
   --template-file 03-vnet.bicep \
   --parameters @parameters/03-vnet.json \
   --parameters registryName="$REGISTRY_NAME" \
@@ -140,7 +142,7 @@ Connect and test:
 ```bash
 # Get ACI private IP from deployment output
 ACI_IP=$(az deployment group show \
-  -g rg-container-instance -n 03-vnet \
+  -g $RG -n 03-vnet \
   --query properties.outputs.aciPrivateIp.value -o tsv)
 
 curl http://$ACI_IP:3000/api/message
@@ -158,7 +160,7 @@ Puts an Application Gateway Standard_v2 in front of ACI. Traffic enters on port 
 
 ```bash
 az deployment group create \
-  --resource-group rg-container-instance \
+  --resource-group $RG \
   --template-file 04-appgw.bicep \
   --parameters @parameters/04-appgw.json \
   --parameters registryName="$REGISTRY_NAME" \
@@ -167,7 +169,7 @@ az deployment group create \
 
 ```bash
 APP_GW_IP=$(az deployment group show \
-  -g rg-container-instance -n 04-appgw \
+  -g $RG -n 04-appgw \
   --query properties.outputs.appGwPublicIp.value -o tsv)
 
 # Port 80 via App GW — no port number needed
@@ -198,7 +200,7 @@ az acr build \
 Deploy:
 ```bash
 az deployment group create \
-  --resource-group rg-container-instance \
+  --resource-group $RG \
   --template-file 05-fileshare.bicep \
   --parameters @parameters/05-fileshare.json \
   --parameters registryName="$REGISTRY_NAME" \
@@ -208,7 +210,7 @@ az deployment group create \
 Upload a test file and read it back:
 ```bash
 STORAGE_NAME=$(az deployment group show \
-  -g rg-container-instance -n 05-fileshare \
+  -g $RG -n 05-fileshare \
   --query properties.outputs.storageAccountName.value -o tsv)
 
 STORAGE_KEY=$(az storage account keys list \
@@ -223,7 +225,7 @@ az storage file upload \
   --account-key $STORAGE_KEY
 
 # List files via the API
-IP=$(az container show -g rg-container-instance -n backend-aci-files \
+IP=$(az container show -g $RG -n backend-aci-files \
   --query ipAddress.ip -o tsv)
 curl http://$IP:3000/api/files
 curl http://$IP:3000/api/file?name=hello.txt
@@ -235,7 +237,7 @@ curl http://$IP:3000/api/file?name=hello.txt
 
 ```bash
 az container logs \
-  --resource-group rg-container-instance \
+  --resource-group $RG \
   --name <container-group-name>
 ```
 
@@ -256,5 +258,5 @@ az container logs \
 ## Clean up
 
 ```bash
-az group delete --name rg-container-instance --yes
+az group delete --name $RG --yes
 ```

@@ -100,11 +100,12 @@ Each file is deployed incrementally to the same resource group. Later steps refe
 
 ```bash
 LOCATION=westeurope
+RG=rg-vnet-peering
 
-az group create --name rg-vnet-peering --location $LOCATION
+az group create --name $RG --location $LOCATION
 
 az deployment group create \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --template-file 01-vnets.bicep \
   --parameters parameters/main.bicepparam \
   --parameters sshPublicKey="$(cat ~/.ssh/id_ed25519.pub)"
@@ -116,7 +117,7 @@ After this step, test **Scenario 1** (same VNet, different subnets — works) an
 
 ```bash
 az deployment group create \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --template-file 02-peering.bicep
 ```
 
@@ -126,18 +127,18 @@ No parameters needed — it references the existing VNets by name. Test **Scenar
 
 ```bash
 # Get hub-vm's private IP
-HUB_IP=$(az vm list-ip-addresses -g rg-vnet-peering -n hub-vm \
+HUB_IP=$(az vm list-ip-addresses -g $RG -n hub-vm \
   --query "[0].virtualMachine.network.privateIpAddresses[0]" -o tsv)
 
 # Deploy route tables and attach them to spoke subnets
 az deployment group create \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --template-file 03-hub-routing.bicep \
   --parameters hubVmPrivateIp=$HUB_IP
 
 # Enable IP forwarding on hub-vm's NIC
 az network nic update \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --name hub-vm-nic \
   --ip-forwarding true
 ```
@@ -158,7 +159,7 @@ SSH into hub-vm (the only VM with a public IP), then jump to the others:
 ```bash
 # Get hub-vm's public IP
 az deployment group show \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --name main \
   --query "properties.outputs" \
   --output table
@@ -196,21 +197,21 @@ ssh -A azureuser@<hub-vm-public-ip>
 ```bash
 # Create a temporary public IP
 az network public-ip create \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --name spoke-a-web-tmp-pip \
   --sku Standard \
   --allocation-method Static
 
 # Attach it to the NIC
 az network nic ip-config update \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --nic-name spoke-a-web-nic \
   --name ipconfig1 \
   --public-ip-address spoke-a-web-tmp-pip
 
 # Get the IP
 az network public-ip show \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --name spoke-a-web-tmp-pip \
   --query ipAddress \
   --output tsv
@@ -220,13 +221,13 @@ ssh azureuser@<temporary-public-ip>
 
 # Clean up after testing
 az network nic ip-config update \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --nic-name spoke-a-web-nic \
   --name ipconfig1 \
   --public-ip-address ""
 
 az network public-ip delete \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --name spoke-a-web-tmp-pip
 ```
 
@@ -311,13 +312,13 @@ Deploy step 3, then run the two manual commands:
 ```bash
 # Deploy route tables (see the Deploy section above for full commands)
 az deployment group create \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --template-file 03-hub-routing.bicep \
   --parameters hubVmPrivateIp=10.10.1.4
 
 # Enable IP forwarding on hub-vm's NIC
 az network nic update \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --name hub-vm-nic \
   --ip-forwarding true
 ```
@@ -348,7 +349,7 @@ By default, all subnets in a VNet can communicate. You can add NSG rules to rest
 
 ```bash
 az network nsg rule create \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --nsg-name spoke-a-app-nsg \
   --name DenyPingFromWeb \
   --priority 100 \
@@ -382,13 +383,13 @@ ping 10.1.2.4    # now fails
 ```bash
 # Hub peerings
 az network vnet peering list \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --vnet-name hub-vnet \
   --output table
 
 # Spoke A peerings
 az network vnet peering list \
-  --resource-group rg-vnet-peering \
+  --resource-group $RG \
   --vnet-name spoke-a-vnet \
   --output table
 ```
@@ -398,7 +399,7 @@ All peerings should show `PeeringState: Connected`.
 ## Tear down
 
 ```bash
-az group delete --name rg-vnet-peering --yes
+az group delete --name $RG --yes
 ```
 
 ---

@@ -32,17 +32,18 @@ container-registry/
 
 ```bash
 LOCATION=westeurope
+RG=rg-acr-demo
 
-az group create --name rg-acr-demo --location $LOCATION
+az group create --name $RG --location $LOCATION
 
 az deployment group create \
-  --resource-group rg-acr-demo \
+  --resource-group $RG \
   --template-file main.bicep \
   --parameters parameters/main.bicepparam
 
 # Get the login server
 REGISTRY=$(az deployment group show \
-  --resource-group rg-acr-demo \
+  --resource-group $RG \
   --name main \
   --query "properties.outputs.loginServer.value" \
   --output tsv)
@@ -347,5 +348,5 @@ Basic is sufficient for development and learning. Use Standard or Premium for pr
 ## Tear down
 
 ```bash
-az group delete --name rg-acr-demo --yes
+az group delete --name $RG --yes
 ```

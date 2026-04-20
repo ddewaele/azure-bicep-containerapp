@@ -42,18 +42,19 @@ VIRTUAL NETWORK  10.0.0.0/16
 
 ```bash
 LOCATION=westeurope
+RG=rg-asg-demo
 
-az group create --name rg-asg-demo --location $LOCATION
+az group create --name $RG --location $LOCATION
 
 # Step 1 — network topology, ASGs, NSGs
 az deployment group create \
-  --resource-group rg-asg-demo \
+  --resource-group $RG \
   --template-file 01-network.bicep \
   --parameters @parameters/01-network.json
 
 # Step 2 — VMs
 az deployment group create \
-  --resource-group rg-asg-demo \
+  --resource-group $RG \
   --template-file 02-vms.bicep \
   --parameters @parameters/02-vms.json \
   --parameters sshPublicKey="$(cat ~/.ssh/azure-cheap-vm/ed25519.pub)"
@@ -63,7 +64,7 @@ az deployment group create \
 
 ```bash
 az deployment group show \
-  --resource-group rg-asg-demo \
+  --resource-group $RG \
   --name 02-vms \
   --query properties.outputs
 ```
@@ -75,7 +76,7 @@ Cloud-init takes ~2 minutes after deployment to finish installing packages.
 ### ✅ Internet → web tier (should work)
 
 ```bash
-WEB_IP=$(az deployment group show -g rg-asg-demo -n 02-vms \
+WEB_IP=$(az deployment group show -g $RG -n 02-vms \
   --query properties.outputs.webVm1PublicIp.value -o tsv)
 
 curl http://$WEB_IP        # nginx default page
@@ -126,5 +127,5 @@ Without ASGs, adding a third web VM means finding its IP and updating every NSG 
 ## Clean up
 
 ```bash
-az group delete --name rg-asg-demo --yes
+az group delete --name $RG --yes
 ```
