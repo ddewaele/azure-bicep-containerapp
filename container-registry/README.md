@@ -61,6 +61,10 @@ az acr build --registry ${REGISTRY%%.*} --image backend:latest  ./backend
 az acr build --registry ${REGISTRY%%.*} --image frontend:latest ./frontend
 ```
 
+> **`TasksOperationsNotAllowed` error?**
+> ACR Tasks (cloud-side builds) are not available on free trial, Azure for Students,
+> or lab/sandbox subscriptions. Use Option B to build locally instead.
+
 ### Option B — Build locally with Docker
 
 On Apple Silicon, pass `--platform linux/amd64`.
