@@ -31,8 +31,10 @@ Note: Basic SKU public IPs were free but are being retired by Azure. Standard SK
 ## Deploy
 
 ```bash
+LOCATION=westeurope
+
 # Create resource group
-az group create --name rg-cheapvm --location westeurope
+az group create --name rg-cheapvm --location $LOCATION
 
 # Deploy (pass your SSH public key)
 az deployment group create \

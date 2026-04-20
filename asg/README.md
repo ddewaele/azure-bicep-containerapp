@@ -41,7 +41,9 @@ VIRTUAL NETWORK  10.0.0.0/16
 ## Deploy
 
 ```bash
-az group create --name rg-asg-demo --location westeurope
+LOCATION=westeurope
+
+az group create --name rg-asg-demo --location $LOCATION
 
 # Step 1 — network topology, ASGs, NSGs
 az deployment group create \
@@ -54,7 +56,7 @@ az deployment group create \
   --resource-group rg-asg-demo \
   --template-file 02-vms.bicep \
   --parameters @parameters/02-vms.json \
-  --parameters sshPublicKey="$(cat ~/.ssh/id_rsa.pub)"
+  --parameters sshPublicKey="$(cat ~/.ssh/azure-cheap-vm/ed25519.pub)"
 ```
 
 ## Get private IPs

@@ -74,7 +74,9 @@ Deployment has two phases: infrastructure first, then apps (after images are pus
 ```bash
 az login
 
-az group create --name rg-biceps-demo --location westeurope
+LOCATION=westeurope
+
+az group create --name rg-biceps-demo --location $LOCATION
 
 # Creates ACR + Log Analytics + Container Apps Environment
 az deployment group create \

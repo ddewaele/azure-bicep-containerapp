@@ -99,7 +99,9 @@ Each file is deployed incrementally to the same resource group. Later steps refe
 ### Step 1 — VNets, subnets, VMs (no peering)
 
 ```bash
-az group create --name rg-vnet-peering --location westeurope
+LOCATION=westeurope
+
+az group create --name rg-vnet-peering --location $LOCATION
 
 az deployment group create \
   --resource-group rg-vnet-peering \

@@ -36,8 +36,10 @@ This project builds up incrementally — each Bicep file adds a new capability o
 ## Common setup
 
 ```bash
+LOCATION=westeurope
+
 # Create resource group (shared across all steps)
-az group create --name rg-container-instance --location westeurope
+az group create --name rg-container-instance --location $LOCATION
 
 # Retrieve registry name and password from container-registry deployment
 REGISTRY_NAME=$(az deployment group show \
@@ -78,7 +80,7 @@ curl http://$IP:3000/api/message
 
 ## Step 2 — DNS name label (`02-dns.bicep`)
 
-Assigns a stable hostname: `<label>.westeurope.azurecontainer.io`
+Assigns a stable hostname: `<label>.<region>.azurecontainer.io` (region matches your deployment location)
 
 ```bash
 az deployment group create \

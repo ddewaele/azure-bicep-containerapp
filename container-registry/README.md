@@ -31,7 +31,9 @@ container-registry/
 ## Deploy the registry
 
 ```bash
-az group create --name rg-acr-demo --location westeurope
+LOCATION=westeurope
+
+az group create --name rg-acr-demo --location $LOCATION
 
 az deployment group create \
   --resource-group rg-acr-demo \
