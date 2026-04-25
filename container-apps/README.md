@@ -75,7 +75,7 @@ Deployment has two phases: infrastructure first, then apps (after images are pus
 az login
 
 LOCATION=westeurope
-RG=rg-biceps-demo
+RG=rg-container-apps
 
 az group create --name $RG --location $LOCATION
 

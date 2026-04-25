@@ -6,7 +6,6 @@
 
 using '../main.bicep'
 
-param location        = 'westeurope'
 param environmentName = 'demo'
 param imageTag        = 'latest'
 
