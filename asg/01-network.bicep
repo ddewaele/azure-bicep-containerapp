@@ -214,7 +214,46 @@ resource nsgDb 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
 }
 
 // ---------------------------------------------------------------------------
-// VNet — two subnets, each with its own NSG
+// NIC-level NSG for logic-vm
+//
+// Demonstrates NIC-level NSGs (vs the subnet-level NSGs above). Azure
+// evaluates NSGs in order:
+//   Inbound:  subnet NSG → NIC NSG → VM        (both must allow)
+//   Outbound: NIC NSG → subnet NSG → wire      (both must allow)
+//
+// NIC NSGs can ADD restrictions beyond the subnet NSG but cannot override
+// a subnet DENY. Here we use it to prevent logic-vm from making outbound
+// calls to the internet — a common least-privilege hardening for backend
+// services that only need to talk to their peers in the VNet.
+//
+// The subnet NSG does not restrict outbound, so this deny has no equivalent
+// at the subnet level and cleanly demonstrates per-VM restrictions.
+// ---------------------------------------------------------------------------
+resource nsgNicLogic 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
+  name: 'nsg-nic-logic-vm'
+  location: location
+  properties: {
+    securityRules: [
+      {
+        name: 'deny-outbound-internet'
+        properties: {
+          priority:                 100
+          protocol:                 '*'
+          access:                   'Deny'
+          direction:                'Outbound'
+          sourceAddressPrefix:      '*'
+          sourcePortRange:          '*'
+          destinationAddressPrefix: 'Internet'
+          destinationPortRange:     '*'
+        }
+      }
+    ]
+  }
+}
+
+// ---------------------------------------------------------------------------
+// VNet — three subnets: web, db, and the dedicated Bastion subnet
+// AzureBastionSubnet must be named exactly that and be at least /26
 // ---------------------------------------------------------------------------
 resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
   name: 'asg-vnet'
@@ -238,19 +277,48 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
           networkSecurityGroup:   { id: nsgDb.id }
         }
       }
+      {
+        // Basic SKU Bastion requires a dedicated /26 (or larger) subnet
+        // named exactly 'AzureBastionSubnet' — no NSG allowed on this subnet
+        name: 'AzureBastionSubnet'
+        properties: {
+          addressPrefix: '10.0.3.0/26'
+        }
+      }
     ]
   }
 }
 
 // ---------------------------------------------------------------------------
-// Azure Bastion — Developer SKU (free, browser-based SSH)
+// Azure Bastion — Standard SKU
+// Requires a Standard public IP and the AzureBastionSubnet above.
+// enableTunneling enables native client support (az network bastion ssh).
+// Cost: ~$0.38/hr (~$280/month) — delete the resource group when done.
 // ---------------------------------------------------------------------------
+resource bastionPip 'Microsoft.Network/publicIPAddresses@2023-09-01' = {
+  name: 'asg-bastion-pip'
+  location: location
+  sku: { name: 'Standard' }
+  properties: {
+    publicIPAllocationMethod: 'Static'
+  }
+}
+
 resource bastion 'Microsoft.Network/bastionHosts@2023-09-01' = {
   name: 'asg-bastion'
   location: location
-  sku: { name: 'Developer' }
+  sku: { name: 'Standard' }
   properties: {
-    virtualNetwork: { id: vnet.id }
+    enableTunneling: true
+    ipConfigurations: [
+      {
+        name: 'ipconfig'
+        properties: {
+          publicIPAddress: { id: bastionPip.id }
+          subnet:          { id: '${vnet.id}/subnets/AzureBastionSubnet' }
+        }
+      }
+    ]
   }
 }
 

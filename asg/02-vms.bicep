@@ -33,7 +33,7 @@ param adminUsername string = 'azureuser'
 param sshPublicKey string
 
 @description('VM size for all VMs.')
-param vmSize string = 'Standard_B2ats_v2'
+param vmSize string = 'Standard_B1s'
 
 // Static private IPs — injected into cloud-init so each VM knows its peers
 @description('Static private IP for logic-vm.')
@@ -61,6 +61,11 @@ resource asgDb 'Microsoft.Network/applicationSecurityGroups@2023-09-01' existing
   name: 'asg-db'
 }
 
+// NIC-level NSG created in 01-network.bicep — attached to logic-vm's NIC below
+resource nsgNicLogic 'Microsoft.Network/networkSecurityGroups@2023-09-01' existing = {
+  name: 'nsg-nic-logic-vm'
+}
+
 // ---------------------------------------------------------------------------
 // Cloud-init scripts
 // Token replacement injects private IPs so cloud-init doesn't need to
@@ -85,7 +90,7 @@ var dbCloudInit = base64(loadTextContent('cloud-init/db.yaml'))
 var imageReference = {
   publisher: 'Canonical'
   offer:     '0001-com-ubuntu-server-jammy'
-  sku:       '22_04-lts'
+  sku:       '22_04-lts-gen2'
   version:   'latest'
 }
 
@@ -149,6 +154,10 @@ resource logicVmNic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
   name: 'logic-vm-nic'
   location: location
   properties: {
+    // NIC-level NSG adds an extra layer on top of the subnet NSG.
+    // Here it denies outbound traffic to the Internet — a restriction
+    // that the subnet NSG does not enforce.
+    networkSecurityGroup: { id: nsgNicLogic.id }
     ipConfigurations: [
       {
         name: 'ipconfig1'
