@@ -74,17 +74,20 @@ Deployment has two phases: infrastructure first, then apps (after images are pus
 ```bash
 az login
 
-az group create --name rg-biceps-demo --location westeurope
+LOCATION=westeurope
+RG=rg-biceps-demo
+
+az group create --name $RG --location $LOCATION
 
 # Creates ACR + Log Analytics + Container Apps Environment
 az deployment group create \
-  --resource-group rg-biceps-demo \
+  --resource-group $RG \
   --template-file main.bicep \
   --parameters parameters/main.bicepparam
 
 # Capture the ACR login server for the next step
 REGISTRY=$(az deployment group show \
-  --resource-group rg-biceps-demo \
+  --resource-group $RG \
   --name main \
   --query "properties.outputs.registryLoginServer.value" \
   --output tsv)
@@ -117,7 +120,7 @@ az acr build --registry ${REGISTRY%%.*} --image frontend:latest ./frontend
 
 ```bash
 az deployment group create \
-  --resource-group rg-biceps-demo \
+  --resource-group $RG \
   --template-file main.bicep \
   --parameters parameters/main.bicepparam \
   --parameters deployApps=true
@@ -127,7 +130,7 @@ az deployment group create \
 
 ```bash
 az deployment group show \
-  --resource-group rg-biceps-demo \
+  --resource-group $RG \
   --name main \
   --query "properties.outputs.frontendUrl.value" \
   --output tsv
@@ -142,7 +145,7 @@ docker build --platform linux/amd64 -t $REGISTRY/frontend:latest ./frontend && d
 
 # Redeploy (creates a new revision that pulls the updated images)
 az deployment group create \
-  --resource-group rg-biceps-demo \
+  --resource-group $RG \
   --template-file main.bicep \
   --parameters parameters/main.bicepparam \
   --parameters deployApps=true
@@ -152,7 +155,7 @@ For CI/CD, use a unique image tag per build:
 
 ```bash
 az deployment group create \
-  --resource-group rg-biceps-demo \
+  --resource-group $RG \
   --template-file main.bicep \
   --parameters parameters/main.bicepparam \
   --parameters deployApps=true imageTag=$(git rev-parse --short HEAD)
@@ -162,7 +165,7 @@ az deployment group create \
 
 ```bash
 az containerapp list \
-  --resource-group rg-biceps-demo \
+  --resource-group $RG \
   --query "[].{name:name, external:properties.configuration.ingress.external}" \
   --output table
 ```
@@ -172,7 +175,7 @@ The backend should show `External: False`.
 ## Tear down
 
 ```bash
-az group delete --name rg-biceps-demo --yes
+az group delete --name $RG --yes
 ```
 
 Removes all resources and stops all charges.

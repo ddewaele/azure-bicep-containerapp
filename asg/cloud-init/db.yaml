@@ -1,0 +1,13 @@
+#cloud-config
+package_update: true
+packages:
+  - postgresql
+  - postgresql-contrib
+runcmd:
+  - systemctl enable postgresql
+  - systemctl start postgresql
+  # Allow password auth and listen on all interfaces (demo only — not for production)
+  - sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'demo1234';"
+  - sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/14/main/postgresql.conf
+  - echo "host all all 10.0.0.0/16 md5" >> /etc/postgresql/14/main/pg_hba.conf
+  - systemctl restart postgresql

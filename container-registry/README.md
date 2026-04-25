@@ -31,16 +31,19 @@ container-registry/
 ## Deploy the registry
 
 ```bash
-az group create --name rg-acr-demo --location westeurope
+LOCATION=westeurope
+RG=rg-acr-demo
+
+az group create --name $RG --location $LOCATION
 
 az deployment group create \
-  --resource-group rg-acr-demo \
+  --resource-group $RG \
   --template-file main.bicep \
   --parameters parameters/main.bicepparam
 
 # Get the login server
 REGISTRY=$(az deployment group show \
-  --resource-group rg-acr-demo \
+  --resource-group $RG \
   --name main \
   --query "properties.outputs.loginServer.value" \
   --output tsv)
@@ -58,6 +61,10 @@ No local Docker needed. ACR builds the images on its own amd64 agents.
 az acr build --registry ${REGISTRY%%.*} --image backend:latest  ./backend
 az acr build --registry ${REGISTRY%%.*} --image frontend:latest ./frontend
 ```
+
+> **`TasksOperationsNotAllowed` error?**
+> ACR Tasks (cloud-side builds) are not available on free trial, Azure for Students,
+> or lab/sandbox subscriptions. Use Option B to build locally instead.
 
 ### Option B — Build locally with Docker
 
@@ -341,5 +348,5 @@ Basic is sufficient for development and learning. Use Standard or Premium for pr
 ## Tear down
 
 ```bash
-az group delete --name rg-acr-demo --yes
+az group delete --name $RG --yes
 ```

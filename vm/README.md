@@ -31,12 +31,15 @@ Note: Basic SKU public IPs were free but are being retired by Azure. Standard SK
 ## Deploy
 
 ```bash
+LOCATION=westeurope
+RG=rg-cheapvm
+
 # Create resource group
-az group create --name rg-cheapvm --location westeurope
+az group create --name $RG --location $LOCATION
 
 # Deploy (pass your SSH public key)
 az deployment group create \
-  --resource-group rg-cheapvm \
+  --resource-group $RG \
   --template-file main.bicep \
   --parameters parameters/main.bicepparam \
   --parameters sshPublicKey="$(cat ~/.ssh/azure-cheap-vm/ed25519.pub)"
@@ -47,14 +50,14 @@ az deployment group create \
 ```bash
 # Get the SSH command from the deployment output
 az deployment group show \
-  --resource-group rg-cheapvm \
+  --resource-group $RG \
   --name main \
   --query "properties.outputs.sshCommand.value" \
   --output tsv
 
 # Or connect directly
 ssh azureuser@$(az deployment group show \
-  --resource-group rg-cheapvm \
+  --resource-group $RG \
   --name main \
   --query "properties.outputs.fqdn.value" \
   --output tsv)
@@ -91,7 +94,7 @@ The identity has no permissions by default. Assign roles to grant access:
 ```bash
 # Get the VM's principal ID from the deployment output
 PRINCIPAL_ID=$(az deployment group show \
-  --resource-group rg-cheapvm \
+  --resource-group $RG \
   --name main \
   --query "properties.outputs.principalId.value" \
   --output tsv)
@@ -129,7 +132,7 @@ az network public-ip list \
 ## Tear down
 
 ```bash
-az group delete --name rg-cheapvm --yes
+az group delete --name $RG --yes
 ```
 
 ## Troubleshooting SSH lockout
@@ -167,14 +170,14 @@ journalctl -u ssh --since "30 min ago" | grep -i "fail\|reject\|not allowed"
 ```bash
 # Unban your IP via fail2ban (also clears its iptables/ufw rules)
 az vm run-command invoke \
-  --resource-group rg-cheapvm \
+  --resource-group $RG \
   --name cheapvm-vm \
   --command-id RunShellScript \
   --scripts "fail2ban-client set sshd unbanip <YOUR_IP_ADDRESS>"
 
 # If a stale ufw reject rule remains
 az vm run-command invoke \
-  --resource-group rg-cheapvm \
+  --resource-group $RG \
   --name cheapvm-vm \
   --command-id RunShellScript \
   --scripts "ufw delete reject from <YOUR_IP_ADDRESS>"

@@ -1,0 +1,166 @@
+#cloud-config
+package_update: true
+write_files:
+  - path: /app/server.js
+    content: |
+      'use strict'
+      const http = require('http')
+      const net  = require('net')
+      const os   = require('os')
+
+      const PORT       = 80
+      const LOGIC_IP   = '__LOGIC_VM_IP__'
+      const LOGIC_PORT = 3000
+      const DB_IP      = '__DB_VM_IP__'
+      const DB_PORT    = 5432
+
+      // Server-side call to logic VM (allowed by NSG: asg-web -> asg-logic:3000)
+      function callLogicVm() {
+        return new Promise((resolve) => {
+          const req = http.get(
+            { hostname: LOGIC_IP, port: LOGIC_PORT, path: '/api/message', timeout: 5000 },
+            (res) => {
+              let body = ''
+              res.on('data', d => body += d)
+              res.on('end', () => {
+                try { resolve({ ok: true, data: JSON.parse(body) }) }
+                catch (e) { resolve({ ok: false, error: e.message }) }
+              })
+            }
+          )
+          req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Timed out after 5s' }) })
+          req.on('error', e => resolve({ ok: false, error: e.message }))
+        })
+      }
+
+      // Server-side direct TCP connect to DB (blocked by NSG: deny-web-to-db)
+      function tryDbDirect() {
+        return new Promise((resolve) => {
+          const sock = new net.Socket()
+          sock.setTimeout(3000)
+          sock.connect(DB_PORT, DB_IP, () => {
+            sock.destroy()
+            resolve({ ok: true, message: 'Connected — NSG rule not working!' })
+          })
+          sock.on('timeout', () => {
+            sock.destroy()
+            resolve({ ok: false, blocked: true, error: 'Timed out after 3s — blocked by deny-web-to-db ✓' })
+          })
+          sock.on('error', e => resolve({ ok: false, error: e.message }))
+        })
+      }
+
+      const server = http.createServer(async (req, res) => {
+        if (req.method !== 'GET' || req.url !== '/') {
+          res.writeHead(404); res.end(); return
+        }
+
+        const [logic, db] = await Promise.all([callLogicVm(), tryDbDirect()])
+
+        const html = `<!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>ASG Demo — Web Tier</title>
+        <style>
+          body  { font-family: monospace; max-width: 860px; margin: 40px auto; padding: 0 20px; background: #0d1117; color: #c9d1d9; }
+          h1,h2 { color: #58a6ff; }
+          .card { border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin: 12px 0; }
+          .allow{ border-color: #238636; }
+          .deny { border-color: #da3633; }
+          .tag  { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin: 2px; }
+          .g    { background: #238636; color:#fff; }
+          .r    { background: #da3633; color:#fff; }
+          .b    { background: #1f6feb; color:#fff; }
+          pre   { background: #161b22; padding: 12px; border-radius: 4px; overflow: auto; margin: 8px 0; }
+          button{ background:#21262d; color:#c9d1d9; border:1px solid #30363d; padding:8px 16px; border-radius:6px; cursor:pointer; margin:4px 0; }
+          button:hover { background:#30363d; }
+        </style>
+      </head>
+      <body>
+        <h1>ASG Demo — Web Tier</h1>
+        <p>
+          <span class="tag b">hostname: ${os.hostname()}</span>
+          <span class="tag b">asg-web</span>
+          <span class="tag b">web-subnet 10.0.1.0/24</span>
+        </p>
+
+        <h2>Server-side calls (from this VM's backend)</h2>
+
+        <div class="card ${logic.ok ? 'allow' : 'deny'}">
+          <strong>${logic.ok ? '✅ ALLOWED' : '❌ FAILED'}</strong>
+          &nbsp;Web VM → Logic VM
+          <span class="tag g">asg-web → asg-logic : 3000</span>
+          <span class="tag g">allow-web-to-logic</span>
+          <pre>${JSON.stringify(logic, null, 2)}</pre>
+        </div>
+
+        <div class="card ${!db.ok ? 'allow' : 'deny'}">
+          <strong>${!db.ok ? '✅ BLOCKED' : '❌ UNEXPECTEDLY ALLOWED'}</strong>
+          &nbsp;Web VM → DB direct
+          <span class="tag r">asg-web → asg-db : 5432</span>
+          <span class="tag r">deny-web-to-db</span>
+          <pre>${JSON.stringify(db, null, 2)}</pre>
+        </div>
+
+        <h2>Client-side calls (from your browser)</h2>
+        <p>These run in your browser. Logic VM and DB are on private IPs — neither has a public endpoint.</p>
+
+        <div class="card">
+          <strong>Browser → Logic VM</strong> &nbsp;<code>${LOGIC_IP}:${LOGIC_PORT}</code>
+          <span class="tag r">private IP, no public endpoint</span><br>
+          <button onclick="clientTest('http://${LOGIC_IP}:${LOGIC_PORT}/api/message','r-logic')">Test from browser</button>
+          <pre id="r-logic">Click to test...</pre>
+        </div>
+
+        <div class="card">
+          <strong>Browser → DB VM</strong> &nbsp;<code>${DB_IP}:${DB_PORT}</code>
+          <span class="tag r">private IP, no public endpoint</span><br>
+          <button onclick="clientTest('http://${DB_IP}:${DB_PORT}/','r-db')">Test from browser</button>
+          <pre id="r-db">Click to test...</pre>
+        </div>
+
+        <script>
+          async function clientTest(url, id) {
+            const el = document.getElementById(id)
+            el.textContent = 'Connecting...'
+            try {
+              const r = await fetch(url, { signal: AbortSignal.timeout(5000) })
+              el.textContent = 'Status ' + r.status + ' — connected (unexpected!)'
+            } catch(e) {
+              el.textContent = 'Failed: ' + e.message
+            }
+          }
+        </script>
+      </body>
+      </html>`
+
+        res.writeHead(200, { 'Content-Type': 'text/html' })
+        res.end(html)
+      })
+
+      server.listen(PORT, () => console.log('Web tier listening on port ' + PORT))
+
+  - path: /etc/systemd/system/web-tier.service
+    content: |
+      [Unit]
+      Description=Web Tier Server
+      After=network.target
+
+      [Service]
+      ExecStart=/usr/bin/node /app/server.js
+      Restart=always
+      RestartSec=5
+      WorkingDirectory=/app
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  - systemctl daemon-reload
+  - systemctl enable web-tier
+  - systemctl start web-tier
